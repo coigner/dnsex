@@ -6,13 +6,18 @@ use crate::error::DnsexError;
 use crate::handler::DnsHandler;
 
 pub struct Server {
+    pub domain: String,
     pub addr: String,
     pub port: u16,
 }
 
 impl Server {
-    pub fn new(addr: impl Into<String>, port: u16) -> Self {
+    pub fn new<T>(domain: T, addr: T, port: u16) -> Self
+    where
+        T: Into<String>,
+    {
         Self {
+            domain: domain.into(),
             addr: addr.into(),
             port,
         }
