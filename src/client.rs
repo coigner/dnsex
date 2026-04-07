@@ -46,10 +46,7 @@ impl Client {
                 .await?;
 
             if response.answers().is_empty() {
-                println!(
-                    "Response code: {}",
-                    response.response_code()
-                );
+                println!("Response code: {}", response.response_code());
             } else {
                 for answer in response.answers() {
                     if let Some(RData::A(ip)) = answer.data() {

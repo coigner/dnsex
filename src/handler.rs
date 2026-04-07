@@ -5,12 +5,13 @@ use hickory_server::{
     authority::MessageResponseBuilder,
     server::{Request, RequestHandler, ResponseHandler, ResponseInfo},
 };
+use std::sync::Arc;
 
 use crate::server::Server;
 
 #[derive(Clone, Debug)]
 pub struct DnsHandler {
-    pub server: Server, // TODO: Add ref
+    pub server: Arc<Server>,
 }
 
 impl DnsHandler {
