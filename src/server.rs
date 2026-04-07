@@ -1,5 +1,6 @@
 use hickory_server::ServerFuture;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::{TcpListener, UdpSocket};
 
 use crate::error::DnsexError;
@@ -24,14 +25,15 @@ impl Server {
         }
     }
 
-    pub async fn start(&self) -> Result<(), DnsexError> {
+    pub async fn start(self) -> Result<(), DnsexError> {
+        let addr: SocketAddr = format!("{}:{}", self.addr, self.port).parse()?;
+
         let handler = DnsHandler {
-            server: self.clone(),
+            server: Arc::new(self),
         };
 
         let mut server = ServerFuture::new(handler);
 
-        let addr: SocketAddr = format!("{}:{}", self.addr, self.port).parse()?;
         let udp_socket = UdpSocket::bind(&addr).await?;
         let tcp_listener = TcpListener::bind(&addr).await?;
 
