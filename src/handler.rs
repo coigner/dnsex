@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hickory_proto::op::ResponseCode;
+use hickory_proto::op::{Header, ResponseCode};
 use hickory_proto::rr::{RData, Record, RecordType, rdata::TXT};
 use hickory_server::{
     authority::MessageResponseBuilder,
@@ -77,6 +77,57 @@ impl DnsHandler {
             flag,
         })
     }
+
+    async fn save_transfer_to_file(&self, chunk_id: &str) -> Result<(), DnsexError> {
+        let mut active_transfers = self.transfers.lock().await;
+        let mut transfer = active_transfers.remove(chunk_id).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "Transfer not found")
+        })?;
+
+        drop(active_transfers);
+
+        let mut sequences: Vec<usize> = transfer.chunks.keys().copied().collect();
+        sequences.sort();
+
+        let mut final_data = Vec::new();
+        for seq in sequences {
+            if let Some(mut chunk_data) = transfer.chunks.remove(&seq) {
+                final_data.append(&mut chunk_data);
+            }
+        }
+
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(&transfer.filename)
+            .await?;
+
+        file.write_all(&final_data).await?;
+        println!("{}: Fin (Saved {} bytes)", chunk_id, final_data.len());
+
+        Ok(())
+    }
+
+    async fn respond_refused(
+        &self,
+        mut response_handle: impl ResponseHandler,
+        builder: MessageResponseBuilder<'_>,
+        mut header: Header,
+    ) -> ResponseInfo {
+        header.set_response_code(ResponseCode::Refused);
+        let response = builder.build_no_records(header);
+
+        match response_handle.send_response(response).await {
+            Ok(info) => return info,
+            Err(e) => {
+                eprintln!("Failed to send DNS response: {}", e);
+
+                let mut header = Header::new();
+                header.set_response_code(ResponseCode::ServFail);
+                return header.into();
+            }
+        };
+    }
 }
 
 #[async_trait]
@@ -92,23 +143,11 @@ impl RequestHandler for DnsHandler {
         let record_type = query.query_type();
 
         let builder = MessageResponseBuilder::from_message_request(request);
-        let mut header = hickory_proto::op::Header::response_from_request(request.header());
+        let mut header = Header::response_from_request(request.header());
 
         let expected_suffix = format!("{}.", self.server.domain);
         if !qname_str.ends_with(&expected_suffix) {
-            header.set_response_code(ResponseCode::Refused);
-            let response = builder.build_no_records(header);
-
-            match response_handle.send_response(response).await {
-                Ok(info) => return info,
-                Err(e) => {
-                    eprintln!("Failed to send DNS response: {}", e);
-
-                    let mut header = hickory_proto::op::Header::new();
-                    header.set_response_code(ResponseCode::ServFail);
-                    return header.into();
-                }
-            };
+            return self.respond_refused(response_handle, builder, header).await;
         }
 
         if record_type == RecordType::TXT {
@@ -134,30 +173,18 @@ impl RequestHandler for DnsHandler {
                         }
                     }
                     ChunkFlag::Fin => {
-                        let mut active_transfers = self.transfers.lock().await;
-                        if let Some(mut transfer) = active_transfers.remove(&chunk.id) {
-                            drop(active_transfers);
+                        if let Err(e) = self.save_transfer_to_file(&chunk.id).await {
+                            eprintln!("UNEXPECTED: Failed to save file {}: {}", chunk.id, e);
+                            header.set_response_code(ResponseCode::ServFail);
+                            let response = builder.build_no_records(header);
 
-                            let mut sequences: Vec<usize> =
-                                transfer.chunks.keys().copied().collect();
-                            sequences.sort();
-
-                            let mut final_data = Vec::new();
-                            for seq in sequences {
-                                if let Some(mut chunk_data) = transfer.chunks.remove(&seq) {
-                                    final_data.append(&mut chunk_data);
+                            match response_handle.send_response(response).await {
+                                Ok(info) => return info,
+                                Err(err) => {
+                                    eprintln!("Failed to send ServFail: {}", err);
+                                    return ResponseInfo::from(hickory_proto::op::Header::new());
                                 }
                             }
-
-                            let mut file = fs::OpenOptions::new()
-                                .write(true)
-                                .create(true)
-                                .open(&transfer.filename)
-                                .await
-                                .unwrap();
-
-                            file.write_all(&final_data).await.unwrap();
-                            println!("{}: Fin (Saved {} bytes)", chunk.id, final_data.len());
                         }
                     }
                 }
