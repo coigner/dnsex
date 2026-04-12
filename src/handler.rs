@@ -21,6 +21,18 @@ pub struct Transfer {
     chunks: HashMap<usize, Vec<u8>>,
 }
 
+impl Transfer {
+    pub fn verify(&self) -> bool {
+        self.chunks.len() == self.total_chunks
+    }
+
+    pub fn missing(&self) -> Vec<usize> {
+        return (0..self.total_chunks)
+            .filter(|seq| !self.chunks.contains_key(seq))
+            .collect();
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ChunkFlag {
     Init,
@@ -173,24 +185,59 @@ impl RequestHandler for DnsHandler {
                         }
                     }
                     ChunkFlag::Fin => {
-                        if let Err(e) = self.save_transfer_to_file(&chunk.id).await {
-                            eprintln!("UNEXPECTED: Failed to save file {}: {}", chunk.id, e);
-                            header.set_response_code(ResponseCode::ServFail);
-                            let response = builder.build_no_records(header);
+                        let (response_text, should_save) = {
+                            let active_transfers = self.transfers.lock().await;
+                            if let Some(transfer) = active_transfers.get(&chunk.id) {
+                                if !transfer.verify() {
+                                    let missing_str = transfer
+                                        .missing()
+                                        .iter()
+                                        .map(|m| m.to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(",");
 
-                            match response_handle.send_response(response).await {
-                                Ok(info) => return info,
-                                Err(err) => {
-                                    eprintln!("Failed to send ServFail: {}", err);
-                                    return ResponseInfo::from(hickory_proto::op::Header::new());
+                                    (format!("MISSING:{}", missing_str), false)
+                                } else {
+                                    (String::from("OK"), true)
+                                }
+                            } else {
+                                (String::from("ERROR: Not Found"), false)
+                            }
+                        };
+
+                        if should_save {
+                            if let Err(e) = self.save_transfer_to_file(&chunk.id).await {
+                                eprintln!("UNEXPECTED: Failed to save file {}: {}", chunk.id, e);
+                                header.set_response_code(ResponseCode::ServFail);
+                                let response = builder.build_no_records(header);
+
+                                match response_handle.send_response(response).await {
+                                    Ok(info) => return info,
+                                    Err(err) => {
+                                        eprintln!("Failed to send ServFail: {}", err);
+                                        return ResponseInfo::from(hickory_proto::op::Header::new());
+                                    }
                                 }
                             }
                         }
+
+                        let rdata = RData::TXT(TXT::new(vec![response_text]));
+                        let record = Record::from_rdata(qname.into(), 60, rdata);
+                        header.set_response_code(ResponseCode::NoError);
+
+                        let response = builder.build(
+                            header,
+                            vec![&record].into_iter(),
+                            vec![].into_iter(),
+                            vec![].into_iter(),
+                            vec![].into_iter(),
+                        );
+
+                        return response_handle.send_response(response).await.unwrap();
                     }
                 }
 
                 let txt: Vec<String> = vec![chunk.seq.to_string()];
-
                 let rdata = RData::TXT(TXT::new(txt));
                 let record = Record::from_rdata(qname.into(), 60, rdata);
                 header.set_response_code(ResponseCode::NoError);
