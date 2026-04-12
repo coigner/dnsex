@@ -13,7 +13,7 @@ dnsex server [OPTIONS] --domain <DOMAIN>
 ```
 
 #### Options:
-  `-d, --domain <DOMAIN>`  
-  `-b, --bind <BIND>`      [default: 0.0.0.0]
-  `-p, --port <PORT>`      [default: 8053]
-  `-h, --help`             Print help
+  `-d, --domain <DOMAIN>`   
+  `-b, --bind <BIND>      [default: 0.0.0.0]`   
+  `-p, --port <PORT>      [default: 8053]`   
+  `-h, --help             Print help`  
