@@ -7,7 +7,6 @@ use hickory_proto::udp::UdpClientStream;
 use rand::Rng;
 use std::io::Write;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::str::FromStr;
 use tokio::net::UdpSocket as TokioUdpSocket;
 use tokio::time::{Duration, sleep};

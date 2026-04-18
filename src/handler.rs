@@ -1,6 +1,5 @@
 use crate::error::DnsexError;
 use crate::server::Server;
-use crate::utils;
 use async_trait::async_trait;
 use data_encoding::BASE32_NOPAD;
 use hickory_proto::op::{Header, ResponseCode};
@@ -39,6 +38,7 @@ pub enum ChunkFlag {
     Init = 1 << 0,
     Data = 1 << 1,
     Fin = 1 << 2,
+    Compressed = 1 << 3,
 }
 
 #[derive(Clone, Debug)]
