@@ -45,9 +45,6 @@ enum Commands {
         #[arg(short, long, default_value_t = 8053)]
         port: u16,
 
-        #[arg()]
-        message: Option<String>,
-
         #[arg(short, long)]
         file: Option<String>,
 
@@ -80,18 +77,11 @@ async fn main() -> Result<(), DnsexError> {
             domain,
             resolver,
             port,
-            message,
             file,
             rate_limit,
             progress,
         } => {
-            let payload = if let Some(msg) = message {
-                ExfilPayload {
-                    filename: "message.txt".into(),
-                    data: msg.into_bytes(),
-                    is_directory: false,
-                }
-            } else if let Some(path) = file {
+            let payload = if let Some(path) = file {
                 let path = Path::new(&path);
                 let (data, is_directory) = if path.is_dir() {
                     (utils::encode_dir(path).await?, true)
