@@ -19,4 +19,7 @@ pub enum DnsexError {
 
     #[error("Join Error: {0}")]
     JoinError(#[from] tokio::task::JoinError),
+
+    #[error("Argument Errro: {0}")]
+    ArgumentError(String),
 }
