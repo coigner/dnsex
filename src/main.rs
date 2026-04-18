@@ -10,7 +10,6 @@ mod client;
 mod error;
 mod handler;
 mod server;
-mod utils;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about = "DnsEx - Created by coigner <coigner@tuta.com>", long_about = None)]
