@@ -182,14 +182,14 @@ impl DnsHandler {
 
 #[async_trait]
 impl RequestHandler for DnsHandler {
-    async fn handle_request<R: ResponseHandler>(&self, request: &Request, mut response_handle: R) -> ResponseInfo {
+    async fn handle_request<R: ResponseHandler>(&self, request: &Request, response_handle: R) -> ResponseInfo {
         let query = request.query();
         let qname = query.name();
         let qname_str = qname.to_string().to_lowercase();
         let record_type = query.query_type();
 
         let builder = MessageResponseBuilder::from_message_request(request);
-        let mut header = Header::response_from_request(request.header());
+        let header = Header::response_from_request(request.header());
 
         let expected_suffix = format!("{}.", self.server.config.domain);
         if !qname_str.ends_with(&expected_suffix) {
@@ -256,8 +256,6 @@ impl RequestHandler for DnsHandler {
             }
         }
 
-        header.set_response_code(ResponseCode::NXDomain);
-        let response = builder.build_no_records(header);
-        return response_handle.send_response(response).await.unwrap();
+        return self.respond_error(response_handle, builder, header, ResponseCode::NXDomain).await;
     }
 }
